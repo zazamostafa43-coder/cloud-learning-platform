@@ -1,240 +1,128 @@
 # Cloud-Based Learning Platform
 
-منصة التعلم السحابية - مشروع شامل يدمج خدمات تعليمية مدعومة بالذكاء الاصطناعي مع بنية تحتية سحابية على AWS.
+An intelligent, cloud-native learning ecosystem that integrates AI-powered educational tools with a robust, scalable microservices architecture deployed on AWS.
 
-## 🌟 نظرة عامة
+## 🌟 Overview
 
-هذا المشروع عبارة عن منصة تعلم سحابية متكاملة تتضمن:
-- **5 خدمات مصغرة (Microservices)** متخصصة
-- **API Gateway** موحد
-- **واجهة مستخدم حديثة** (React)
-- **بنية تحتية AWS** متكاملة (Terraform)
-- **Kafka** للتواصل غير المتزامن
-- **CI/CD Pipeline** مع GitHub Actions
+This platform is a comprehensive learning solution designed to streamline educational workflows. It features:
+- **5 Specialized Microservices** for AI-driven tasks.
+- **Unified API Gateway** for secure and efficient routing.
+- **Modern React Frontend** for a premium user experience.
+- **AWS Infrastructure** fully orchestrated via Terraform.
+- **Apache Kafka** for reliable asynchronous event streaming.
+- **Full CI/CD Pipeline** with GitHub Actions and security scanning.
 
-## 🏗️ معمارية المشروع
+## 🏗️ System Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        FRONTEND                              │
-│                    (React + Vite)                            │
-│                     Port: 3000                               │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│                     API GATEWAY                              │
-│                   (FastAPI + CORS)                           │
-│                     Port: 8000                               │
-└──────┬───────┬───────┬───────┬───────┬──────────────────────┘
-       │       │       │       │       │
-       ▼       ▼       ▼       ▼       ▼
-┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐
-│ STT  │ │ TTS  │ │ DOC  │ │ CHAT │ │ QUIZ │
-│ 8001 │ │ 8002 │ │ 8003 │ │ 8004 │ │ 8005 │
-└──┬───┘ └──┬───┘ └──┬───┘ └──┬───┘ └──┬───┘
-   │        │        │        │        │
-   └────────┴────────┼────────┴────────┘
-                     ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      KAFKA                                   │
-│              (Event Streaming)                               │
-└─────────────────────────────────────────────────────────────┘
-                     │
-   ┌─────────────────┼─────────────────┐
-   ▼                 ▼                 ▼
-┌──────┐       ┌──────────┐       ┌─────────┐
-│  S3  │       │ PostgreSQL│       │  Redis  │
-│      │       │          │       │ (Cache) │
-└──────┘       └──────────┘       └─────────┘
+```mermaid
+graph TD
+    User((User)) -->|HTTPS| ALB[AWS Application Load Balancer]
+    ALB -->|Port 3000| Frontend[React Web UI]
+    Frontend -->|REST API| Gateway[FastAPI Gateway]
+    
+    subgraph "Microservices Layer"
+        Gateway --> STT[Speech-to-Text]
+        Gateway --> TTS[Text-to-Speech]
+        Gateway --> DOC[Document Processor]
+        Gateway --> CHAT[AI Assistant]
+        Gateway --> QUIZ[Quiz Generator]
+    end
+    
+    subgraph "Event Bus"
+        STT & TTS & DOC & CHAT & QUIZ <--> Kafka[Apache Kafka]
+    end
+    
+    subgraph "Data Persistence"
+        Kafka --> S3[Amazon S3 Storage]
+        Kafka --> DB[(PostgreSQL)]
+        Kafka --> Cache[(Redis Cache)]
+    end
 ```
 
-## 🚀 الخدمات
+## 🚀 Services & Tech Stack
 
-| الخدمة | الوصف | المنفذ |
-|--------|-------|--------|
-| **STT Service** | تحويل الصوت إلى نص | 8001 |
-| **TTS Service** | تحويل النص إلى صوت | 8002 |
-| **Document Service** | معالجة المستندات | 8003 |
-| **Chat Service** | مساعد ذكي | 8004 |
-| **Quiz Service** | إنشاء الاختبارات | 8005 |
-| **API Gateway** | نقطة الدخول الموحدة | 8000 |
-| **Frontend** | واجهة المستخدم | 3000 |
+| Service | Description | Tech | Port |
+|:---|:---|:---|:---|
+| **STT Service** | Instant audio-to-text transcription | Whisper / Python | 8001 |
+| **TTS Service** | High-quality text-to-speech synthesis | gTTS / Python | 8002 |
+| **Doc Service** | Structured text extraction from PDF/Docx | PyPDF2 / Docx | 8003 |
+| **Chat Service** | Context-aware AI learning assistant | Knowledge Base | 8004 |
+| **Quiz Service** | Dynamic assessment generation | Logic-driven | 8005 |
+| **Gateway** | Centralized entry point with rate limiting | FastAPI | 8000 |
+| **Frontend** | Interactive responsive dashboard | React + Vite | 3000 |
 
-## 📁 هيكل المشروع
+## 📁 Project Structure
 
-```
+```text
 Project_Cloud_final/
-├── frontend/                 # React Frontend
-│   ├── src/
-│   │   ├── App.jsx          # المكون الرئيسي
-│   │   └── App.css          # الأنماط
-│   └── Dockerfile
-├── gateway/                  # API Gateway
-│   ├── main.py
-│   └── Dockerfile
-├── services/                 # الخدمات المصغرة
-│   ├── common/              # المكونات المشتركة
-│   │   ├── kafka_handler.py
-│   │   ├── s3_handler.py
-│   │   ├── database.py
-│   │   └── models.py
-│   ├── stt_service/
-│   ├── tts_service/
-│   ├── document_service/
-│   ├── chat_service/
-│   └── quiz_service/
-├── infrastructure/           # Terraform / AWS
-│   └── main.tf
-├── .github/workflows/        # CI/CD
-│   └── main.yml
-├── docker-compose.yml
-├── requirements.txt
-└── README.md
+├── frontend/                 # React Application
+├── gateway/                  # Central API Entry Point
+├── services/                 # Microservices (STT, TTS, DOC, etc.)
+│   └── common/               # Shared handlers (Kafka, S3, DB)
+├── infrastructure/           # Infrastructure as Code (Terraform)
+├── docs/                     # Detailed architectural designs
+├── .github/workflows/        # Automated Deployment (CI/CD)
+├── docker-compose.yml        # Local orchestration
+└── .env.example              # Environment template
 ```
 
-## 🛠️ المتطلبات
+## 🛠️ Prerequisites
 
-- Docker & Docker Compose
-- Python 3.11+
-- Node.js 18+
-- AWS CLI (للنشر السحابي)
+- **Docker Desktop** (latest)
+- **Node.js** v18+ & **npm**
+- **Python** 3.11+
+- **AWS CLI** configured (for cloud operations)
 
-## 🏃 التشغيل المحلي
+## 🏃 Local Setup & Development
 
-### 1. استنساخ المشروع
+### 1. Clone the repository
 ```bash
-git clone <repository-url>
+git clone https://github.com/zazamostafa43-coder/cloud-learning-platform.git
 cd Project_Cloud_final
 ```
 
-### 2. إعداد المتغيرات البيئية
+### 2. Configure Environment
 ```bash
 cp .env.example .env
-# عدّل .env بمعلومات AWS الخاصة بك
+# Update .env with your specific AWS credentials
 ```
 
-### 3. تشغيل Docker Compose
+### 3. Spin up the containers
 ```bash
 docker-compose up --build
 ```
 
-### 4. الوصول للتطبيق
-- **Frontend**: http://localhost:3000
-- **API Gateway**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
+### 4. Access the Platform
+- **Frontend Dashboard**: `http://localhost:3000`
+- **System Gateway**: `http://localhost:8000`
+- **API Interactive Docs**: `http://localhost:8000/docs`
 
-## 📡 Kafka Topics
+## 📡 Event-Driven Integration (Kafka)
 
-| Topic | الوصف |
-|-------|-------|
-| `audio.transcription.completed` | اكتمال تحويل الصوت لنص |
-| `audio.generation.completed` | اكتمال توليد الصوت |
-| `document.uploaded` | رفع مستند جديد |
-| `document.processed` | اكتمال معالجة المستند |
-| `notes.generated` | إنشاء ملاحظات جديدة |
-| `quiz.generated` | إنشاء اختبار جديد |
-| `chat.message` | رسالة محادثة |
+The system leverages a robust event-driven model to ensure high availability and decoupling:
+- `audio.transcription.completed`: Triggered by STT for processing results.
+- `document.processed`: Alerts other services that new educational context is available.
+- `quiz.generated`: Notifies the frontend that assessment materials are ready.
 
-## ☁️ AWS Services
+## ☁️ Cloud Infrastructure (AWS)
 
-| الخدمة | الاستخدام |
-|--------|----------|
-| **S3** | تخزين الملفات (صوت، مستندات) |
-| **RDS** | قاعدة بيانات PostgreSQL |
-| **ECR** | تخزين Docker Images |
-| **VPC** | الشبكة الافتراضية |
-| **ALB** | موزع الحمل |
+Fully provisioned using Terraform:
+- **Networking**: Custom VPC with Public, Private, and Data subnet tiers.
+- **Storage**: S3 buckets with server-side encryption and versioning.
+- **Database**: Managed RDS PostgreSQL instance.
+- **Deployment**: Amazon ECR for container image management.
 
-## 🔧 CI/CD Pipeline
+## 🔧 Automated CI/CD
 
-الـ Pipeline يقوم بـ:
-1. ✅ اختبار الكود
-2. 🔨 بناء Docker Images
-3. 📤 رفع Images إلى ECR
-4. 🔍 فحص أمني (Trivy)
-5. 📢 إشعار بالنشر
+The pipeline automatically triggers on push to `main`:
+1. **Validation**: Runs linting and basic service health checks.
+2. **Build**: Generates optimized Docker images for all components.
+3. **Release**: Pushes images to Amazon ECR.
+4. **Security**: Integrated **Trivy** scan for container vulnerabilities.
 
-## 📚 API Documentation
+## 📄 License & Contributing
 
-### STT Service
-```http
-POST /stt/transcribe
-Content-Type: multipart/form-data
-
-file: <audio_file>
-language: ar
-```
-
-### TTS Service
-```http
-POST /tts/synthesize
-Content-Type: application/json
-
-{
-  "text": "مرحباً بالعالم",
-  "language": "ar"
-}
-```
-
-### Document Service
-```http
-POST /documents/upload
-Content-Type: multipart/form-data
-
-file: <pdf_or_docx>
-```
-
-### Chat Service
-```http
-POST /chat/message
-Content-Type: application/json
-
-{
-  "message": "مرحباً"
-}
-```
-
-### Quiz Service
-```http
-POST /quiz/generate
-Content-Type: application/json
-
-{
-  "topic": "general",
-  "num_questions": 5
-}
-```
-
-## 🔐 الأمان
-
-- تشفير البيانات في S3 (SSE-S3)
-- Security Groups لكل طبقة
-- Rate Limiting في API Gateway
-- CORS مُعد بشكل صحيح
-
-## 📈 المراحل
-
-| المرحلة | الوصف | الدرجات |
-|---------|-------|---------|
-| Phase 1 | AWS Infrastructure | 7 |
-| Phase 2 | Microservices & Kafka | 7 |
-| Phase 3 | Security, CI/CD | 6 |
-| **المجموع** | | **20** |
-
-## 👥 المساهمة
-
-للمساهمة في المشروع:
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## 📄 الترخيص
-
-هذا المشروع للأغراض التعليمية.
+Built for educational excellence. Contributions are welcome—please submit a PR or open an issue for major changes.
 
 ---
-
-**تم البناء بـ ❤️ باستخدام FastAPI, Docker, Kafka, AWS**
+**Crafted with passion using FastAPI, React, Docker, and AWS.**

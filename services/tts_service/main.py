@@ -95,7 +95,7 @@ async def synthesize_speech(request: TTSRequest):
         return TTSResponse(
             id=request_id,
             status="completed",
-            message="✅ تم إنشاء الملف الصوتي بنجاح!",
+            message="✅ Audio file generated successfully!",
             audio_url=f"/api/tts/audio/{request_id}/download",
             text_preview=request.text[:100] if len(request.text) > 100 else request.text
         )
@@ -104,7 +104,7 @@ async def synthesize_speech(request: TTSRequest):
         return TTSResponse(
             id=request_id,
             status="error",
-            message=f"❌ خطأ في إنشاء الصوت: {str(e)}",
+            message=f"❌ Error generating audio: {str(e)}",
             text_preview=request.text[:50]
         )
 

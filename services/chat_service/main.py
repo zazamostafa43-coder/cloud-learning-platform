@@ -40,63 +40,33 @@ class ChatResponse(BaseModel):
 
 # Knowledge base for intelligent responses (Bilingual)
 KNOWLEDGE_BASE = {
-    "python": {
-        "ar": "Python هي لغة برمجة عالية المستوى سهلة التعلم. تستخدم في تطوير الويب، علوم البيانات، والذكاء الاصطناعي.",
-        "en": "Python is a high-level, easy-to-learn programming language used in web development, data science, and AI."
-    },
-    "docker": {
-        "ar": "Docker هو منصة لتشغيل التطبيقات في حاويات معزولة لضمان ثبات البيئة.",
-        "en": "Docker is a platform for running applications in isolated containers, ensuring consistent environments."
-    },
-    "kafka": {
-        "ar": "Apache Kafka هو نظام message queue موزع عالي الأداء للتواصل بين الخدمات.",
-        "en": "Apache Kafka is a high-performance distributed message queue used for service communication."
-    },
-    "aws": {
-        "ar": "Amazon Web Services هي منصة حوسبة سحابية رائدة تقدم خدمات التخزين والذكاء الاصطناعي.",
-        "en": "Amazon Web Services (AWS) is a leading cloud platform offering storage, compute, and AI services."
-    },
-    "fastapi": {
-        "ar": "FastAPI هو إطار عمل Python حديث وسريع لبناء APIs مع توثيق تلقائي.",
-        "en": "FastAPI is a modern, fast Python framework for building APIs with automatic documentation."
-    }
+    "python": "Python is a high-level, easy-to-learn programming language used in web development, data science, and AI.",
+    "docker": "Docker is a platform for running applications in isolated containers, ensuring consistent environments.",
+    "kafka": "Apache Kafka is a high-performance distributed message queue used for service communication.",
+    "aws": "Amazon Web Services (AWS) is a leading cloud platform offering storage, compute, and AI services.",
+    "fastapi": "FastAPI is a modern, fast Python framework for building APIs with automatic documentation."
 }
 
 # Keyword patterns
-GREETING_KEYWORDS = ["hello", "hi", "hey", "مرحبا", "اهلا", "hey", "السلام"]
-HELP_KEYWORDS = ["help", "مساعدة", "how", "كيف", "explain", "شرح"]
+GREETING_KEYWORDS = ["hello", "hi", "hey", "welcome"]
+HELP_KEYWORDS = ["help", "how", "explain", "guide"]
 
-def detect_language(text: str) -> str:
-    """Simple language detection based on characters"""
-    arabic_chars = [chr(i) for i in range(0x0600, 0x06FF)]
-    if any(char in arabic_chars for char in text):
-        return "ar"
-    return "en"
-
-def find_knowledge(query: str, lang: str) -> Optional[str]:
-    """Find relevant knowledge based on language"""
+def find_knowledge(query: str) -> Optional[str]:
+    """Find relevant knowledge entry"""
     query_lower = query.lower()
-    for key, values in KNOWLEDGE_BASE.items():
+    for key, value in KNOWLEDGE_BASE.items():
         if key in query_lower:
-            return values.get(lang, values.get("en"))
+            return value
     return None
 
 def generate_ai_response(message: str, conversation_history: List[dict], document_text: str = None) -> str:
-    """Generate bilingual intelligent response"""
-    lang = detect_language(message)
+    """Generate intelligent AI response"""
     message_lower = message.lower()
     
     if any(kw in message_lower for kw in GREETING_KEYWORDS):
-        if lang == "ar":
-            return "مرحباً بك! أنا مساعدك الذكي في منصة التعلم السحابية. كيف يمكنني مساعدتك؟ 🎓"
-        return "Hello! I'm your AI learning assistant. How can I help you today? 🤖"
+        return "Welcome! I'm your AI learning assistant. How can I help you today? 🤖"
     
     if any(kw in message_lower for kw in HELP_KEYWORDS):
-        if lang == "ar":
-            return """🌟 **إليك ما يمكنني القيام به:**
-- تحويل الصوت (STT) ونص للخدمة.
-- إنشاء اختبارات ذكية من ملفاتك.
-- الإجابة على استفساراتك التعليمية."""
         return """🌟 **I can help you with:**
 - **STT**: Convert your voice notes to text.
 - **TTS**: Generate natural speech from text.
@@ -105,17 +75,13 @@ def generate_ai_response(message: str, conversation_history: List[dict], documen
 - Ask me anything about Cloud, Python, or your documents!"""
 
     if document_text:
-        if lang == "ar":
-            return f"📚 **بناءً على المستند المرفوع:**\n\n{document_text[:300]}...\n\nهل تريد إنشاء اختبار حول هذا المحتوى؟"
         return f"📚 **Based on the uploaded document:**\n\n{document_text[:300]}...\n\nWould you like me to generate a quiz based on this content?"
 
-    knowledge = find_knowledge(message, lang)
+    knowledge = find_knowledge(message)
     if knowledge:
-        return f"📖 **{message.capitalize()}:**\n\n{knowledge}\n\n" + ("Do you want to know more?" if lang == "en" else "هل تريد معرفة المزيد؟")
+        return f"📖 **{message.capitalize()}:**\n\n{knowledge}\n\nDo you want to know more?"
 
     # Default responses
-    if lang == "ar":
-        return f"سؤال رائع عن '{message}'! جرب رفع مستند حول هذا الموضوع لأتمكن من مساعدتك بشكل أفضل. 📄"
     return f"Great question about '{message}'! Try uploading a document about this topic so I can assist you better. 📄"
 
 @app.post("/api/chat/message", response_model=ChatResponse)
