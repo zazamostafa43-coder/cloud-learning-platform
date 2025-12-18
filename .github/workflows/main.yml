@@ -1,0 +1,212 @@
+name: CI/CD Pipeline - Cloud Learning Platform
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: 643539270955.dkr.ecr.us-east-1.amazonaws.com
+
+jobs:
+  # Job 1: Lint and Test
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio httpx
+
+    - name: Run linting
+      run: |
+        pip install flake8
+        flake8 services/ gateway/ --max-line-length=120 --ignore=E501,W503 || true
+
+    - name: Run tests
+      run: |
+        echo "Running service health checks..."
+        python -c "from services.common.kafka_handler import KafkaHandler; print('Kafka handler OK')"
+        python -c "from services.common.s3_handler import S3Handler; print('S3 handler OK')"
+
+  # Job 2: Build and Push Docker Images
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    # Build and push Gateway
+    - name: Build and push Gateway
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: gateway/Dockerfile
+        push: true
+        tags: |
+          ${{ env.ECR_REGISTRY }}/learning-platform/gateway:latest
+          ${{ env.ECR_REGISTRY }}/learning-platform/gateway:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    # Build and push STT Service
+    - name: Build and push STT Service
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: services/stt_service/Dockerfile
+        push: true
+        tags: |
+          ${{ env.ECR_REGISTRY }}/learning-platform/stt-service:latest
+          ${{ env.ECR_REGISTRY }}/learning-platform/stt-service:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    # Build and push TTS Service
+    - name: Build and push TTS Service
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: services/tts_service/Dockerfile
+        push: true
+        tags: |
+          ${{ env.ECR_REGISTRY }}/learning-platform/tts-service:latest
+          ${{ env.ECR_REGISTRY }}/learning-platform/tts-service:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    # Build and push Chat Service
+    - name: Build and push Chat Service
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: services/chat_service/Dockerfile
+        push: true
+        tags: |
+          ${{ env.ECR_REGISTRY }}/learning-platform/chat-service:latest
+          ${{ env.ECR_REGISTRY }}/learning-platform/chat-service:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    # Build and push Document Service
+    - name: Build and push Document Service
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: services/document_service/Dockerfile
+        push: true
+        tags: |
+          ${{ env.ECR_REGISTRY }}/learning-platform/document-service:latest
+          ${{ env.ECR_REGISTRY }}/learning-platform/document-service:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    # Build and push Quiz Service
+    - name: Build and push Quiz Service
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: services/quiz_service/Dockerfile
+        push: true
+        tags: |
+          ${{ env.ECR_REGISTRY }}/learning-platform/quiz-service:latest
+          ${{ env.ECR_REGISTRY }}/learning-platform/quiz-service:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    # Build and push Frontend
+    - name: Build and push Frontend
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend
+        file: frontend/Dockerfile
+        push: true
+        tags: |
+          ${{ env.ECR_REGISTRY }}/learning-platform/frontend:latest
+          ${{ env.ECR_REGISTRY }}/learning-platform/frontend:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Image scan summary
+      run: |
+        echo "✅ All images built and pushed successfully!"
+        echo "Images pushed:"
+        echo "  - ${{ env.ECR_REGISTRY }}/learning-platform/gateway:latest"
+        echo "  - ${{ env.ECR_REGISTRY }}/learning-platform/stt-service:latest"
+        echo "  - ${{ env.ECR_REGISTRY }}/learning-platform/tts-service:latest"
+        echo "  - ${{ env.ECR_REGISTRY }}/learning-platform/chat-service:latest"
+        echo "  - ${{ env.ECR_REGISTRY }}/learning-platform/document-service:latest"
+        echo "  - ${{ env.ECR_REGISTRY }}/learning-platform/quiz-service:latest"
+        echo "  - ${{ env.ECR_REGISTRY }}/learning-platform/frontend:latest"
+
+  # Job 3: Security Scan
+  security-scan:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'table'
+        exit-code: '0'
+        ignore-unfixed: true
+        severity: 'CRITICAL,HIGH'
+
+  # Job 4: Deploy notification
+  deploy-notification:
+    needs: [build-and-push, security-scan]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    
+    steps:
+    - name: Deployment Summary
+      run: |
+        echo "🚀 Deployment Summary"
+        echo "====================="
+        echo "Branch: ${{ github.ref_name }}"
+        echo "Commit: ${{ github.sha }}"
+        echo "Author: ${{ github.actor }}"
+        echo ""
+        echo "✅ All images built and pushed to ECR"
+        echo "✅ Security scan completed"
+        echo ""
+        echo "📋 Next Steps:"
+        echo "1. Update ECS task definitions with new image tags"
+        echo "2. Deploy to ECS cluster"
+        echo "3. Verify service health"

@@ -1,0 +1,220 @@
+# Docker Compose for Cloud-Based Learning Platform
+# Simplified configuration for reliable startup
+
+services:
+  # ============================================
+  # INFRASTRUCTURE SERVICES
+  # ============================================
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - learning-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    networks:
+      - learning-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: learning_platform
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - learning-network
+
+  # ============================================
+  # MICROSERVICES
+  # ============================================
+
+  stt-service:
+    build:
+      context: .
+      dockerfile: services/stt_service/Dockerfile
+    container_name: stt-service
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      DATABASE_URL: postgresql://user:password@postgres:5432/learning_platform
+      STT_S3_BUCKET: stt-service-storage-dev
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+    ports:
+      - "8001:8001"
+    depends_on:
+      - kafka
+      - postgres
+    restart: on-failure
+    networks:
+      - learning-network
+
+  tts-service:
+    build:
+      context: .
+      dockerfile: services/tts_service/Dockerfile
+    container_name: tts-service
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      DATABASE_URL: postgresql://user:password@postgres:5432/learning_platform
+      TTS_S3_BUCKET: tts-service-storage-dev
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+    ports:
+      - "8002:8002"
+    depends_on:
+      - kafka
+      - postgres
+    restart: on-failure
+    networks:
+      - learning-network
+
+  document-service:
+    build:
+      context: .
+      dockerfile: services/document_service/Dockerfile
+    container_name: document-service
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      DATABASE_URL: postgresql://user:password@postgres:5432/learning_platform
+      DOC_S3_BUCKET: document-reader-storage-dev
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+    ports:
+      - "8003:8003"
+    depends_on:
+      - kafka
+      - postgres
+    restart: on-failure
+    networks:
+      - learning-network
+
+  chat-service:
+    build:
+      context: .
+      dockerfile: services/chat_service/Dockerfile
+    container_name: chat-service
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      DATABASE_URL: postgresql://user:password@postgres:5432/learning_platform
+      CHAT_S3_BUCKET: chat-service-storage-dev
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+    ports:
+      - "8004:8004"
+    depends_on:
+      - kafka
+      - postgres
+    restart: on-failure
+    networks:
+      - learning-network
+
+  quiz-service:
+    build:
+      context: .
+      dockerfile: services/quiz_service/Dockerfile
+    container_name: quiz-service
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      DATABASE_URL: postgresql://user:password@postgres:5432/learning_platform
+      QUIZ_S3_BUCKET: quiz-service-storage-dev
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+    ports:
+      - "8005:8005"
+    depends_on:
+      - kafka
+      - postgres
+    restart: on-failure
+    networks:
+      - learning-network
+
+  # ============================================
+  # API GATEWAY
+  # ============================================
+
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    container_name: gateway
+    ports:
+      - "8000:8000"
+    environment:
+      STT_SERVICE_URL: http://stt-service:8001
+      TTS_SERVICE_URL: http://tts-service:8002
+      DOC_SERVICE_URL: http://document-service:8003
+      CHAT_SERVICE_URL: http://chat-service:8004
+      QUIZ_SERVICE_URL: http://quiz-service:8005
+    depends_on:
+      - stt-service
+      - tts-service
+      - document-service
+      - chat-service
+      - quiz-service
+    restart: on-failure
+    networks:
+      - learning-network
+
+  # ============================================
+  # FRONTEND
+  # ============================================
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - gateway
+    restart: on-failure
+    networks:
+      - learning-network
+
+# ============================================
+# NETWORKS & VOLUMES
+# ============================================
+
+networks:
+  learning-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
